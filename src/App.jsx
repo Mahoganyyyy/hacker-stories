@@ -3,19 +3,19 @@ import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import './App.css'
 
-const App = () => {
-  const [searchTerm, setSearchTerm] = useState(
-    localStorage.getItem("search") || ""
+const useStorageState = (key, initialState) => {
+  const [value, setValue] = useState(
+    localStorage.getItem(key) || initialState
   );
 
   useEffect(() => {
-    localStorage.setItem("search", event.target.value);
-  }, [searchTerm]);
+    localStorage.setItem(key, value);
+  }, [value]);
 
-  const handleSearch = (event) => {
-    setSearchTerm(event.target.value);
-  }
+  return [value, key];
+};
 
+const App = () => {
   const stories = [
     {
       title: "React",
@@ -34,6 +34,12 @@ const App = () => {
       objectID: 1
     },
   ];
+
+  const [searchTerm, setSearchTerm] = useStorageState('search', 'React');
+
+  const handleSearch = (event) => {
+    setSearchTerm(event.target.value);
+  }
 
   return (
     <div>
