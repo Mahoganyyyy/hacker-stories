@@ -1,6 +1,4 @@
-import { useEffect, useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
+import { useEffect, useReducer, useState } from 'react'
 import './App.css'
 
 const useStorageState = (key, initialState) => {
@@ -12,81 +10,147 @@ const useStorageState = (key, initialState) => {
     localStorage.setItem(key, value);
   }, [value]);
 
-  return [value, key];
+  return [value, setValue];
 };
 
-const App = () => {
-  const stories = [
-    {
-      title: "React",
-      url: "https://react.dev",
-      author: "Jordan Walke",
-      num_comments: 3,
-      points: 4,
-      objectID: 0
-    },
-    {
-      title: "Redux",
-      url: "https://redux.js.org",
-      author: "Dan Abramov, Andrew Clark",
-      num_comments: 2,
-      points: 5,
-      objectID: 1
-    },
-  ];
+const initialStories = [
+  {
+    title: "React",
+    url: "https://react.dev",
+    author: "Jordan Walke",
+    num_comments: 3,
+    points: 4,
+    objectID: 0
+  },
+  {
+    title: "Redux",
+    url: "https://redux.js.org",
+    author: "Dan Abramov, Andrew Clark",
+    num_comments: 2,
+    points: 5,
+    objectID: 1
+  },
+];
 
-  const [searchTerm, setSearchTerm] = useStorageState('search', 'React');
+const getAsyncStories = () => 
+  new Promise((resolve, reject) => 
+    setTimeout(
+      () => resolve({data: { stories: initialStories}}),
+      2000
+    )
+);
+
+const storiesReducer = (state, action) => {
+  switch(action.type){
+    case "STORIES_FETCH_INIT": {
+      return {
+        ...state,
+        isLoading: true,
+        isError: false,
+      };
+    }
+    case "STORIES_FETCH_SUCCESS": {
+      return {
+        ...state,
+        isLoading: false,
+        isError: false,
+        data: action.payload
+      }
+    }
+    case "STORIES_FETCH_FAILURE": {
+      return {
+        ...state,
+        isLoading: false,
+        isError: true,
+      }
+    }
+    case "REMOVE_STORY": {
+      return {
+        ...state,
+        data: state.data.filter(
+        (story) => action.payload.objectID !== story.objectID
+      )};
+    }
+    default: {
+      throw new Error();
+    }
+  }
+}
+
+const App = () => {
+  const [searchTerm, setSearchTerm] = useStorageState('search', '');
+  const [stories, dispatchStories] = useReducer(storiesReducer, {data: [], isLoading: false, isError: false});
+
+  useEffect(() => {
+    dispatchStories({type: "STORIES_FETCH_INIT"});
+
+    getAsyncStories().then(result => {
+      dispatchStories({type: "STORIES_FETCH_SUCCESS", payload: result.data.stories});
+    })
+    .catch(() => dispatchStories({type: "STORIES_FETCH_FAILURE"})) 
+  }, [])
 
   const handleSearch = (event) => {
     setSearchTerm(event.target.value);
   }
 
+  const handleRemoveStory = (item) => {
+    dispatchStories({type: "REMOVE_STORY", payload: item});
+  }
+
   return (
-    <div>
+    <>
       <h1>My Hacker Stories</h1>
 
-      <Search onSearch={handleSearch} search={searchTerm} />
+      <InputWithLabel id="search" label="Search" onInputChange={handleSearch} value={searchTerm}>
+        <strong>Search: </strong>
+      </InputWithLabel>
 
       <hr />
 
-      <List list={stories.filter((item) => item.title.toLowerCase().includes(searchTerm.toLowerCase()))} />
+      {stories.isError && <p>Something went wrong...</p>}
 
-    </div>
+      {stories.isLoading ? (
+        <p>Loading...</p>
+      ) : (
+      <List list={stories.data.filter((item) => item.title.toLowerCase().includes(searchTerm.toLowerCase()))} onRemoveItem={handleRemoveStory} />
+      )}
+    </>
 )};
 
 
-const Search = ({onSearch, search}) => { 
-  const handleBlur = (event) => {
-    console.log("Blur");
-    console.log(event);
-    console.log(event.target.value);
-  };
-  
+const InputWithLabel = ({ id, value, type="text", onInputChange, children }) => {   
   return (
-    <div>
-      <label htmlFor="search">Search: </label>
-      <input value={search} id="search" type="text" onBlur={handleBlur} onChange={onSearch} />
-    </div>
+    <>
+      <label htmlFor={id}>{children}</label>
+      <input value={value} id={id} type={type} onChange={onInputChange} />
+    </>
   )
 };
 
-const List = ({list}) => (
+const List = ({list, onRemoveItem}) => (
   <ul>
-    {list.map(({ objectID, ...item}) => 
-      <Item key={objectID} {...item} />
+    {list.map((item) => 
+      <Item key={item.objectID} item={item} onRemoveItem={onRemoveItem} />
     )}
   </ul>
 );
 
-const Item = ({title, url, author, num_comments, points}) => (
-      <li>
-        <span>
-          <a href={url} target='blank'>{title} </a>
-        </span>
-        <span>{author} </span>
-        <span>{num_comments} </span>
-        <span>{points} </span>
-      </li>
-);
+const Item = ({item, onRemoveItem}) => (
+    <li>
+      <span>
+        <a href={item.url} target='blank'>{item.title} </a>
+      </span>
+      <span>{item.author} </span>
+      <span>{item.num_comments} </span>
+      <span>{item.points} </span>
+      <span>
+        <button type="button" onClick={() => onRemoveItem(item)}>
+          Dismiss
+        </button>
+      </span>
+    </li>
+  );
+  
 
 export default App
